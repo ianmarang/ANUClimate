@@ -136,12 +136,15 @@ class ANUClimateAuto_rerun(object):
         * missing - sorted list of missing dates
         '''
         # set cut off at 6mth mark (BoM files deleted after 6mths)
-        threshDate = dt.datetime.today() - relativedelta.relativedelta(months=6)
+        threshDate = dt.date.today() - relativedelta.relativedelta(months=6)
+        print threshDate
         if dateL[0]<threshDate:
+            print 'dateL[0] older than threshold'
             startD = threshDate
         else:
+            print 'dateL[0] not older than threshold'
             startD = dateL[0]
-        date_set = set(startD + dt.timedelta(x) for x in range((dt.datetime.today() - startD).days))
+        date_set = set(startD + dt.timedelta(x) for x in range((dt.date.today() - startD).days))
         missing = sorted(date_set - set(dateL))
         return missing;
     
@@ -936,6 +939,8 @@ class ANUClimateAuto_rerun(object):
             pass
             
             
+
+
 ##################################################
 # LOOP
 ##################################################
@@ -951,21 +956,20 @@ ancr = ANUClimateAuto_rerun()
 # open log file
 dfLog = pd.read_csv(ancr.logPath+'ANUClimate_log.csv',index_col=[0])
 dfLogDates = sorted(list(set(dfLog.file_handle.sort_values())))
-dfLogDates = [dt.datetime(int(x[14:18]),int(x[18:20]),int(x[20:22])) if type(x) == str and len(x) == 25 else '' for x in dfLogDates]
+dfLogDates = [dt.date(int(x[14:18]),int(x[18:20]),int(x[20:22])) if type(x) == str and len(x) == 25 else '' for x in dfLogDates]
 dfLogDates = list(filter(None, dfLogDates))
+print dfLogDates
 fullMissingDates = ancr.findMissingDates(dfLogDates)
 
 fullMissingDatesFH = ['ANUdaily9am3pm'+str(x.isoformat().split('T')[0][:4])+str(x.isoformat().split('T')[0][5:7]).zfill(2)+str(x.isoformat().split('T')[0][8:10]).zfill(2)+calendar.day_name[x.weekday()][:3] for x in fullMissingDates]
 
-
-
 # Part 2
 #### N.B. run this process weekly and only look for dates in preceding week, therefore avoiding repeat re-runs
 dateNow = dt.datetime.today()
-dateMin = dateNow - relativedelta.relativedelta(days=1000)
+dateMin = dateNow - relativedelta.relativedelta(months=6)
 
 # split out int time components from file_handle (eg: 'ANUdaily9am3pm20170812Sat' is 2017,08,12 for datetime comparison)
-dfLog['fhDate'] = [dt.datetime(int(x[14:18]),int(x[18:20]),int(x[20:22])) if type(x) == str and len(x) == 25 else '' for x in dfLog.file_handle]
+dfLog['fhDate'] = [dt.date(int(x[14:18]),int(x[18:20]),int(x[20:22])) if type(x) == str and len(x) == 25 else '' for x in dfLog.file_handle]
 dateListFH = list(set(dfLog.fhDate.loc[pd.to_datetime(dfLog.fhDate)>=dateMin]))
 
 # loop over dates to find processing dates where run_complete flag not found
@@ -980,8 +984,8 @@ for date in dateListFH:
         fH = list(set(dfLogDate.file_handle))
         #print fH
         fullMissingDatesFH.append(fH[0])
-        # initial dict creation
-        
+# initial dict creation
+
 # create master list of dates to rerun
 itr = 0
 for i in fullMissingDatesFH:
@@ -992,13 +996,13 @@ for i in fullMissingDatesFH:
         call = 'alpha'
     dateList,timing,state,comment = ancr.getDateStringMissing(call=call,fHandle=i)
     if itr == 0:
-            missingDict = {i:[call,dateList]}
+        missingDict = {i:[call,dateList]}
     # append for new dates
     else:
         missingDict1 = {i:[call,dateList]}
         missingDict.update(missingDict1)
     itr+=1
-    
+
 f = open(ancr.logPath+'missingDates_'+str(dt.datetime.today().isoformat().split('T')[0])+'.txt','w')
 
 
