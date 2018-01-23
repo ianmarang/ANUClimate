@@ -1,4 +1,5 @@
 35 14 * * * bash /srv/ANUClimate_auto/script/ANUClimate_auto_cycle.sh
 05 15 * * * bash /srv/ANUClimate_auto/script/ANUClimate_auto_transfer.sh
 30 19 * * * bash /srv/ANUClimate_auto/script/ANUClimate_rerun.sh
+05 21 * * * bash /srv/ANUClimate_auto/script/ANUClimate_auto_transfer_rerun.sh
 05 19 1 * * bash /srv/ANUClimate_auto/script/ANUClimate_auto_cleanup.sh

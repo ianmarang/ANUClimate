@@ -1,6 +1,6 @@
 ####################################################################################
 # ANUClimate automation
-# v16.0
+# v15.0
 # author: Ian Marang
 #
 # Description:
@@ -27,7 +27,7 @@ import time
 from tabulate import tabulate
 from glob import glob
 
-class ANUClimateAuto(object):
+class ANUClimateAuto_rerun(object):
     def __init__(self):
 
         self.hostName = 'ftp.bom.gov.au'
@@ -40,7 +40,7 @@ class ANUClimateAuto(object):
         self.state = 0
         self.baseDir = '/srv/ANUClimate_auto/processed/fenner'
         # varDict = df col name:[var name for file[0],alpha daily files location[1],beta month of days files location[2], stable month of days files location[3],beta monthly files location[4], stable monthly files location[5]]
-        self.varDict = {'Prec_mm':['rain',self.baseDir+'/rain_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/rain_day_v2_0/beta/dat/bomdat/',self.baseDir+'/rain_day_v2_0/stable/dat/bomdat/',self.baseDir+'/rain_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/rain_mth_v2_0/stable/dat/bomdat/'],
+        self.varDict = {'Prec_mm':['rain',self.baseDir+'/rain_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/rain_day_v2_0/beta/dat/bomdat/',self.baseDir+'/rain_day_v2_0/stable/dat/bomdat/',self.baseDir+'/rain_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/rain_mth_v2_0/stable/dat/bomdat'],
                         'Evap_mm':['evap',self.baseDir+'/evap_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/evap_day_v2_0/beta/dat/bomdat/',self.baseDir+'/evap_day_v2_0/stable/dat/bomdat/',self.baseDir+'/evap_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/evap_mth_v2_0/stable/dat/bomdat/'],
                         'Tmax_C':['tmax',self.baseDir+'/tmax_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/tmax_day_v2_0/beta/dat/bomdat/',self.baseDir+'/tmax_day_v2_0/stable/dat/bomdat/',self.baseDir+'/tmax_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/tmax_mth_v2_0/stable/dat/bomdat/'],
                         'Tmin_C':['tmin',self.baseDir+'/tmin_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/tmin_day_v2_0/beta/dat/bomdat/',self.baseDir+'/tmin_day_v2_0/stable/dat/bomdat/',self.baseDir+'/tmin_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/tmin_mth_v2_0/stable/dat/bomdat/'],
@@ -48,16 +48,7 @@ class ANUClimateAuto(object):
                         'Temp_avg_C':['tavg',self.baseDir+'/tavg_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/tavg_day_v2_0/beta/dat/bomdat/',self.baseDir+'/tavg_day_v2_0/stable/dat/bomdat/',self.baseDir+'/tavg_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/tavg_mth_v2_0/stable/dat/bomdat/'],
                         'Vpd_avg_hPa':['vpd',self.baseDir+'/vpd_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/vpd_day_v2_0/beta/dat/bomdat/',self.baseDir+'/vpd_day_v2_0/stable/dat/bomdat/',self.baseDir+'/vpd_mth_v2_0/beta/dat/bomdat/',self.baseDir+'/vpd_mth_v2_0/stable/dat/bomdat/']}
     
-        for key,var in self.varDict.iteritems():
-            for varItem in var[1:]:
-                try:
-                    os.makedirs(varItem)
-                    os.makedirs(self.baseDir+'/pw_mth_v2_0/beta/dat/bomdat/')
-                    os.makedirs(self.baseDir+'/pw_mth_v2_0/stable/dat/bomdat/')
-                    os.makedirs(self.baseDir+'/frst_mth_v2_0/beta/dat/bomdat/')
-                    os.makedirs(self.baseDir+'/frst_mth_v2_0/stable/dat/bomdat/')
-                except:
-                    pass
+
 
      ####################################################################################
     # UTILITY (prep)
@@ -78,11 +69,9 @@ class ANUClimateAuto(object):
             content = tabulate(df, tablefmt="plain",floatfmt=".3f")
         open(fname, "w").write(content)
         
-    
-
 
     # date string finder
-    def getDateString(self,call=None,mod=None):
+    def getDateStringMissing(self,call=None,fHandle=None):
         '''
         Takes a requested call and returns:
         * a string in correct format to match BoM zip files
@@ -100,8 +89,8 @@ class ANUClimateAuto(object):
         '''
         start = time.time()
         baseStr = 'ANUdaily9am3pm'
-        if mod:
-            dtToday = dt.datetime.today()-relativedelta.relativedelta(days=mod)
+        if fHandle:
+            dtToday = dt.datetime(int(fHandle[14:18]),int(fHandle[18:20]),int(fHandle[20:22]))
         else:
             dtToday = dt.datetime.today()
         # create fHandle (looking for file from today)
@@ -132,49 +121,31 @@ class ANUClimateAuto(object):
             comment = 'Incorrect call arg supplied, must be str "alpha", or "all".'
             self.state = 1
 
-        fhandle = baseStr+str(dateYr)+str(dateMt).zfill(2)+str(dateDy).zfill(2)+dayOfWeek[:3]
         timing = time.time()-start
-        return fhandle,dateList,timing,self.state,comment;
-
-
-
-    # function to find out which data stream to process
-    def findDataStream(self):
+        return dateList,timing,self.state,comment;
+        
+        
+    def findMissingDates(self,dateL):
         '''
-        Function to determine correct data stream to process (alpha or all) based on date and comparison with end of month
-
+        Takes list of dates and finds dates with no entry from the start of the log till now
+        
+        args:
+        * dateL - list of dates in log
+        
         returns:
-        str 'alpha' or 'all'
+        * missing - sorted list of missing dates
         '''
-        start = time.time()
-        mthDays = {31:['01','03','05','07','08','10','12'],30:['04','06','09','11'],28:['02']}
-        mthDaysLeap = {31:['01','03','05','07','08','10','12'],30:['04','06','09','11'],29:['02']}
-
-        date = dt.datetime.today()
-        dy = date.isoformat().split('T')[0][8:10]
-        mth = date.isoformat().split('T')[0][5:7]
-        yr = date.isoformat().split('T')[0][:4]
-
-
-        if calendar.isleap(int(yr)):
-            for var,varDetails in mthDaysLeap.items():
-                if mth in set(varDetails):
-                    daysInMth = var
+        # set cut off at 6mth mark (BoM files deleted after 6mths)
+        threshDate = dt.datetime.today() - relativedelta.relativedelta(months=6)
+        if dateL[0]<threshDate:
+            startD = threshDate
         else:
-            for var,varDetails in mthDays.items():
-                if mth in set(varDetails):
-                    daysInMth = var      
+            startD = dateL[0]
+        date_set = set(startD + dt.timedelta(x) for x in range((dt.datetime.today() - startD).days))
+        missing = sorted(date_set - set(dateL))
+        return missing;
+    
 
-        if int(dy) == int(daysInMth):
-            outStr = 'all'
-        else:
-            outStr = 'alpha'
-        timing = time.time() - start
-        self.state = 0
-        comment = 'findDataStream complete'
-        return outStr,timing,self.state,comment;
-        
-        
     def downloadFTP(self,fHandle):
         '''
         Connects to BoM ftp site, makes dirs, downloads file and unzips it, writing a list of unzipped files in the backup dir
@@ -186,60 +157,55 @@ class ANUClimateAuto(object):
         timing, state and comment
         '''
         start = time.time()
+        # establish ftp connection and move to correct folder
+        ftp = ftplib.FTP(self.hostName)
+        ftp.login()
+        ftp.cwd(self.hostPath)
+        # find correct file on ftp server and create vars for folder names
+        fName = 'DS082_'+fHandle+'.zip'
+        dirName = self.destPath+fHandle
+        zipName = self.zipPath+fHandle
+        listName = self.backupPath+fHandle
+        # make folders
         try:
-            # establish ftp connection and move to correct folder
-            ftp = ftplib.FTP(self.hostName)
-            ftp.login()
-            ftp.cwd(self.hostPath)
-            # find correct file on ftp server and create vars for folder names
-            fName = 'DS082_'+fHandle+'.zip'
-            dirName = self.destPath+fHandle
-            zipName = self.zipPath+fHandle
-            listName = self.backupPath+fHandle
-            # make folders
-            try:
-                os.makedirs(dirName)
-            except:
-                pass
-            try:
-                os.makedirs(zipName)
-            except:
-                pass
-            try:
-                os.makedirs(listName)
-            except:
-                pass
-            # create zip file and download
-            zFile = open(dirName+'/'+fName,'wb')
-            remoteSize = ftp.size(fName)
-            ftp.retrbinary('RETR '+fName,zFile.write)
-            zFile.close()
-            localInfo = os.stat(dirName+'/'+fName)
-            if str(localInfo.st_size)!=str(remoteSize):
-                self.state = 1
-                comment = 'Size check failed'
-            else:
-                pass
-            # move to download folder and extract to unzip folder
-            os.chdir(dirName)
-            try:
-                zipFile = zipfile.ZipFile(dirName+'/'+fName,'r')
-                zipFile.extractall(zipName)
-            except Exception as e:
-                self.state = 1
-                comment = 'Unzip failed '+str(e)
-            # make a list of all downloaded files
-            f = open(listName+'/'+fHandle+'.txt','w')
-            for fname in zipFile.namelist():
-                f.write(fname+',\n')
-            f.close()
-            # set state
-            self.state = 0
-            comment = 'FTP success for '+str(fHandle)
-        except Exception as e:
-            comment = str(e)
+            os.makedirs(dirName)
+        except:
+            pass
+        try:
+            os.makedirs(zipName)
+        except:
+            pass
+        try:
+            os.makedirs(listName)
+        except:
+            pass
+        # create zip file and download
+        zFile = open(dirName+'/'+fName,'wb')
+        remoteSize = ftp.size(fName)
+        ftp.retrbinary('RETR '+fName,zFile.write)
+        zFile.close()
+        localInfo = os.stat(dirName+'/'+fName)
+        if str(localInfo.st_size)!=str(remoteSize):
             self.state = 1
-            print('FTP failed.')
+            comment = 'Size check failed'
+        else:
+            pass
+        # move to download folder and extract to unzip folder
+        os.chdir(dirName)
+        try:
+            zipFile = zipfile.ZipFile(dirName+'/'+fName,'r')
+            zipFile.extractall(zipName)
+        except Exception as e:
+            self.state = 1
+            comment = 'Unzip failed '+str(e)
+        # make a list of all downloaded files
+        f = open(listName+'/'+fHandle+'.txt','w')
+        for fname in zipFile.namelist():
+            f.write(fname+',\n')
+        f.close()
+        # set state
+        self.state = 0
+        comment = 'FTP success for '+str(fHandle)
         timing = time.time() - start
         return timing,self.state,comment;
 
@@ -968,53 +934,119 @@ class ANUClimateAuto(object):
             df.to_csv(self.logPath+'ANUClimate_log.csv')
         else:
             pass
+            
+            
+##################################################
+# LOOP
+##################################################
+# find unique dates of processing
+## two parts:
+## 1) find dates that didn't run at all
+## 2) find dates that didn't complete (ie have entries, but no 'run_complete' in dfLog.process) DONE
+
+ancr = ANUClimateAuto_rerun()
+
+# part 1
+
+# open log file
+dfLog = pd.read_csv(ancr.logPath+'ANUClimate_log.csv',index_col=[0])
+dfLogDates = sorted(list(set(dfLog.file_handle.sort_values())))
+dfLogDates = [dt.datetime(int(x[14:18]),int(x[18:20]),int(x[20:22])) if type(x) == str and len(x) == 25 else '' for x in dfLogDates]
+dfLogDates = list(filter(None, dfLogDates))
+fullMissingDates = ancr.findMissingDates(dfLogDates)
+
+fullMissingDatesFH = ['ANUdaily9am3pm'+str(x.isoformat().split('T')[0][:4])+str(x.isoformat().split('T')[0][5:7]).zfill(2)+str(x.isoformat().split('T')[0][8:10]).zfill(2)+calendar.day_name[x.weekday()][:3] for x in fullMissingDates]
 
 
-####################################################################################
-# MAIN loop
-####################################################################################
-if __name__ == '__main__':
-    startFull = time.time()
 
-    # function list:
-    anc = ANUClimateAuto()
+# Part 2
+#### N.B. run this process weekly and only look for dates in preceding week, therefore avoiding repeat re-runs
+dateNow = dt.datetime.today()
+dateMin = dateNow - relativedelta.relativedelta(days=1000)
 
-    dataStream,fdsTiming,fdsState,fdsComment = anc.findDataStream()
+# split out int time components from file_handle (eg: 'ANUdaily9am3pm20170812Sat' is 2017,08,12 for datetime comparison)
+dfLog['fhDate'] = [dt.datetime(int(x[14:18]),int(x[18:20]),int(x[20:22])) if type(x) == str and len(x) == 25 else '' for x in dfLog.file_handle]
+dateListFH = list(set(dfLog.fhDate.loc[pd.to_datetime(dfLog.fhDate)>=dateMin]))
 
-    fHandle,dateList,gdsTiming,gdsState,gdsComment = anc.getDateString(dataStream)
-
-    anc.logger(fHandle,'findDataStream_'+dataStream,str(round(fdsTiming,4)),str(fdsState),str(fdsComment))
-    anc.logger(fHandle,'getDateString_'+str(dateList),str(round(gdsTiming,4)),str(gdsState),str(gdsComment))
-
-    ftpTiming,ftpState,ftpComment = anc.downloadFTP(fHandle)
-
-    anc.logger(fHandle,'downloadFTP',str(round(ftpTiming,4)),str(ftpState),str(ftpComment))
-
-    if dataStream == 'alpha':
-        dfDay,clTiming,clState,clComment = anc.compileLoop(fHandle,dateList[0],'alpha')
-        anc.logger(fHandle,'compileLoop_alpha',str(round(clTiming,4)),str(clState),str(clComment))
-        aTiming,aState,aComment = anc.reFormatDaily(dfDay,dateList[0])
-        anc.logger(fHandle,'reFormatDaily',str(round(aTiming,4)),str(aState),str(aComment))
+# loop over dates to find processing dates where run_complete flag not found
+for date in dateListFH:
+    #print date
+    dfLogDate = dfLog.loc[dfLog.fhDate==date]
+    # check for run_complete flag (if found, pass; if missing process)
+    if 'run_complete' in list(set(dfLogDate.process)):
+        pass
     else:
-        dfDay,clTiming,clState,clComment = anc.compileLoop(fHandle,dateList[0],'alpha')
-        anc.logger(fHandle,'compileLoop_alpha',str(round(clTiming,4)),str(clState),str(clComment))
-        aTiming,aState,aComment = anc.reFormatDaily(dfDay,dateList[0])
-        anc.logger(fHandle,'reFormatDaily',str(round(aTiming,4)),str(aState),str(aComment))
-        del dfDay
-        dfBMth,clTiming,clState,clComment = anc.compileLoop(fHandle,dateList[1],'beta')
-        anc.logger(fHandle,'compileLoop_beta',str(round(clTiming,4)),str(clState),str(clComment))
-        bTiming,bState,bComment = anc.reFormatMonthOfDays(dfBMth,dateList[1],'beta')
-        anc.logger(fHandle,'reFormatMonthOfDays_beta',str(round(bTiming,4)),str(bState),str(bComment))
-        bMTiming,bMState,bMComment = anc.reFormatMonthly(dfBMth,dateList[1],'beta')
-        anc.logger(fHandle,'reFormatMonthly_beta',str(round(bMTiming,4)),str(bMState),str(bMComment))
-        del dfBMth
-        dfSMth,clTiming,clState,clComment = anc.compileLoop(fHandle,dateList[2],'stable')
-        anc.logger(fHandle,'compileLoop_stable',str(round(clTiming,4)),str(clState),str(clComment))
-        sTiming,sState,sComment = anc.reFormatMonthOfDays(dfSMth,dateList[2],'stable')
-        anc.logger(fHandle,'reFormatMonthOfDays_stable',str(round(sTiming,4)),str(sState),str(sComment))
-        sMTiming,sMState,sMComment = anc.reFormatMonthly(dfSMth,dateList[2],'stable')
-        anc.logger(fHandle,'reFormatMonthly_stable',str(round(sMTiming,4)),str(sMState),str(sMComment))
-        del dfSMth
+        # create datevars to include in missingDict
+        fH = list(set(dfLogDate.file_handle))
+        #print fH
+        fullMissingDatesFH.append(fH[0])
+        # initial dict creation
+        
+# create master list of dates to rerun
+itr = 0
+for i in fullMissingDatesFH:
+    numDays = ancr.daysInMth(int(i[14:18]),int(i[18:20]))
+    if int(i[20:22])==int(numDays):
+        call = 'all'
+    else:
+        call = 'alpha'
+    dateList,timing,state,comment = ancr.getDateStringMissing(call=call,fHandle=i)
+    if itr == 0:
+            missingDict = {i:[call,dateList]}
+    # append for new dates
+    else:
+        missingDict1 = {i:[call,dateList]}
+        missingDict.update(missingDict1)
+    itr+=1
+    
+f = open(ancr.logPath+'missingDates_'+str(dt.datetime.today().isoformat().split('T')[0])+'.txt','w')
 
-    timeFull = time.time()-startFull
-    anc.logger(fHandle,'run_complete',str(round(timeFull,4)),'0','na')
+
+try:
+    print missingDict
+
+    for mFHandle,mDateVars in missingDict.iteritems():
+        f.write(mFHandle+','+str(mDateVars)+'\n')
+        print mFHandle,str(mDateVars)
+        startFull = time.time()
+    
+        ancr.logger(mFHandle,'findDataStream_'+str(mDateVars[0]),'0.001','0','findDataStream complete RERUN')
+        ancr.logger(mFHandle,'getDateString_'+str(mDateVars[1]),'0.001','0',mDateVars[0]+' call RERUN')
+
+        ftpTiming,ftpState,ftpComment = ancr.downloadFTP(mFHandle)
+
+        ancr.logger(mFHandle,'downloadFTP',str(round(ftpTiming,4)),str(ftpState),str(ftpComment)+' RERUN')
+
+        if mDateVars[0] == 'alpha':
+            dfDay,clTiming,clState,clComment = ancr.compileLoop(mFHandle,mDateVars[1][0],'alpha')
+            ancr.logger(mFHandle,'compileLoop_alpha',str(round(clTiming,4)),str(clState),str(clComment)+' RERUN')
+            aTiming,aState,aComment = ancr.reFormatDaily(dfDay,mDateVars[1][0])
+            ancr.logger(mFHandle,'reFormatDaily',str(round(aTiming,4)),str(aState),str(aComment)+' RERUN')
+        else:
+            dfDay,clTiming,clState,clComment = ancr.compileLoop(mFHandle,mDateVars[1][0],'alpha')
+            ancr.logger(mFHandle,'compileLoop_alpha',str(round(clTiming,4)),str(clState),str(clComment)+' RERUN')
+            aTiming,aState,aComment = ancr.reFormatDaily(dfDay,mDateVars[1][0])
+            ancr.logger(mFHandle,'reFormatDaily',str(round(aTiming,4)),str(aState),str(aComment)+' RERUN')
+            del dfDay
+            dfBMth,clTiming,clState,clComment = ancr.compileLoop(mFHandle,mDateVars[1][1],'beta')
+            ancr.logger(mFHandle,'compileLoop_beta',str(round(clTiming,4)),str(clState),str(clComment)+' RERUN')
+            bTiming,bState,bComment = ancr.reFormatMonthOfDays(dfBMth,mDateVars[1][1],'beta')
+            ancr.logger(mFHandle,'reFormatMonthOfDays_beta',str(round(bTiming,4)),str(bState),str(bComment))
+            bMTiming,bMState,bMComment = ancr.reFormatMonthly(dfBMth,mDateVars[1][1],'beta')
+            ancr.logger(mFHandle,'reFormatMonthly_beta',str(round(bMTiming,4)),str(bMState),str(bMComment)+' RERUN')
+            del dfBMth
+            dfSMth,clTiming,clState,clComment = ancr.compileLoop(mFHandle,mDateVars[1][2],'stable')
+            ancr.logger(mFHandle,'compileLoop_stable',str(round(clTiming,4)),str(clState),str(clComment)+' RERUN')
+            sTiming,sState,sComment = ancr.reFormatMonthOfDays(dfSMth,mDateVars[1][2],'stable')
+            ancr.logger(mFHandle,'reFormatMonthOfDays_stable',str(round(sTiming,4)),str(sState),str(sComment)+' RERUN')
+            sMTiming,sMState,sMComment = ancr.reFormatMonthly(dfSMth,mDateVars[1][2],'stable')
+            ancr.logger(mFHandle,'reFormatMonthly_stable',str(round(sMTiming,4)),str(sMState),str(sMComment)+' RERUN')
+            del dfSMth
+
+        timeFull = time.time()-startFull
+        ancr.logger(mFHandle,'run_complete',str(round(timeFull,4)),'0','RERUN')
+
+    f.close()
+
+except:
+    print 'No missing dates'
