@@ -22,7 +22,7 @@ from dateutil.relativedelta import relativedelta
 class ANUClimate_model_run(object):
     def __init__(self):
         self.baseDir = '/g/data/rr9/fenner'
-        self.scriptPath = '/g/data/rr9/fenner/prerelease/ANUClimate_auto/script/model_run'
+        self.scriptPath = '/g/data/rr9/fenner/prerelease/ANUClimate_auto/script/model_runtime'
         self.logPath = '/g/data/rr9/fenner/prerelease/ANUClimate_auto/log'
         # varDict definition = {variable:[.dat source file location, batch file location, output array location]}
         self.varDict = {'tmax':[self.baseDir+'/prerelease/fenner/tmax_day_v2_0/alpha/dat/bomdat/',self.baseDir+'/prerelease/fenner/tmax_day_v2_0/alpha/batch/',self.baseDir+'aus_tmax_day_v2_0/alpha/']}#,
@@ -121,7 +121,7 @@ class ANUClimate_model_run(object):
                 self.logger(dtToday,'abort run no src files: qsub -a '+dtNextday+' ANUClimate_model_run.sh',dtNohyp,b[0].decode('ascii'))
             else:
                 # call subprocess for next day resubmission
-                p = subprocess.Popen(['qsub -a '+dtNexthr+' ANUClimate_model_run.sh'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+                p = subprocess.Popen(['qsub -a '+dtNexthour+' ANUClimate_model_run.sh'],shell=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
                 b = p.communicate()
                 # log bash command for next hour resubmission
                 self.logger(dtToday,'no src files: qsub -a '+dtNexthour+' ANUClimate_model_run.sh',dtNohyp,b[0].decode('ascii'))
