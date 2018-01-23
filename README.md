@@ -17,13 +17,13 @@ Stable - high level certainty product (full BoM QA) from data 6 months prior
 
 In addition to the QA undertaken by BoM, the automation schema handles some basic checks on data quality at the reformatting stage.  There are 3 file types produced depending on when the process is run.  If the last day of the month, daily, month of days and monthly aggregated files are produced.  At any other time only daily files are returned.
 
-Python scripts to achieve this are as follows:
-- PyANUClimate.py
-- PyANUClimate_model_run (and a bash shell script to call it)
-- PyANUClimate_reRun_model (and a bash shell script to call it)
-- PyANUClimate_nc (and a bash shell script to call it) TBD
+In order to comply with the operating environment on the main HPC system in use (NCI), processes are run on an externally hosted VM (within USYD network) to download the BoM point files and generate the source files for the model run. The model run processes are executed on NCI using submitted PBS batch jobs (and hence have a .sh script to call the Python scripts).
 
-In order to comply with the operating environment on the main HPC system in use (NCI), PyANUClimate.py is run on an externally hosted VM (within USYD network), while the remaining 3 key processes are run on NCI using submitted PBS batch jobs (and hence have a .sh script to call the Python scripts).
+Repo folder structure is split to reflect this:
+- model_prep houses the bash and python scripts to process the source files, as well as the crontab (as a .txt file) to automate them
+- model_run houses the python scripts to execute the model
+-- model_runtime houses the bash scripts for model runs (to centralise the output and log files)
+-- nc_output houses the bash script to generate the final netcdf product (to centralise the output and log files)
 
 Process flow:
 ================
